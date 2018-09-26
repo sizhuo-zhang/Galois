@@ -28,6 +28,7 @@
 #include <fstream>
 #include <functional>
 #include <set>
+#include <iostream>
 
 #ifdef GALOIS_USE_NUMA
 #include <numa.h>
@@ -109,6 +110,22 @@ static std::vector<cpuinfo> parseCPUInfo() {
       break;
 
     int num;
+#ifdef __riscv
+    // [sizhuo] riscv linux /proc/cpuinfo does not match usual format. Assume
+    // hart id is always increasing.
+    if (sscanf(line.data(), "hart : %d", &num) == 1) {
+      assert(cur < num);
+      cur = num;
+      vals.resize(cur + 1);
+      vals.at(cur).proc = num;
+      vals.at(cur).physid = 0; // no numa
+      vals.at(cur).sib = num; // no smt, this field is not really used
+      vals.at(cur).coreid = num; // no smt
+      vals.at(cur).cpucores = 0; // total cpus, set later
+      vals.at(cur).numaNode = 0; // no numa
+      vals.at(cur).valid = true; // no cpuset
+    }
+#else
     if (sscanf(line.data(), "processor : %d", &num) == 1) {
       assert(cur < num);
       cur = num;
@@ -123,7 +140,15 @@ static std::vector<cpuinfo> parseCPUInfo() {
     } else if (sscanf(line.data(), "cpu cores : %d", &num) == 1) {
       vals.at(cur).cpucores = num;
     }
+#endif
   }
+
+#ifdef __riscv
+  // [sizhuo] get total cpu number
+  for (auto& c : vals) {
+    c.cpucores = vals.size();
+  }
+#endif
 
   for (auto& c : vals)
     c.numaNode = getNumaNode(c);
@@ -257,6 +282,22 @@ galois::substrate::getHWTopo() {
 
   std::sort(info.begin(), info.end());
   markSMT(info);
+
+#ifndef NDEBUG
+  // [sizhuo] print cpu parse results
+  std::cout << "CPU parse results: total " << info.size() << " cpus" << std::endl;
+  for (auto& c : info) {
+    std::cout << "proc " << c.proc
+              << ", physid " << c.physid
+              << ", sib " << c.sib
+              << ", coreid " << c.coreid
+              << ", cpucores " << c.cpucores
+              << ", numaNode " << c.numaNode
+              << ", valid " << c.valid
+              << ", smt " << c.smt << std::endl;
+  }
+#endif
+
   retMTI.maxSockets   = countSockets(info);
   retMTI.maxThreads   = info.size();
   retMTI.maxCores     = countCores(info);

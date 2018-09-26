@@ -58,7 +58,7 @@ static const bool doHandMap = false;
 static const int _MAP_POP      = _MAP;
 static const bool doHandMap    = true;
 #endif
-#ifdef MAP_HUGETLB
+#if defined(MAP_HUGETLB) && !defined(GALOIS_NO_HUGE_PAGE)
 static const int _MAP_HUGE_POP = MAP_HUGETLB | _MAP_POP;
 static const int _MAP_HUGE     = MAP_HUGETLB | _MAP;
 #else

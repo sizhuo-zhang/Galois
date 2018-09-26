@@ -287,10 +287,18 @@ find_package(Threads REQUIRED)
 #find_package(LLVM)
 
 # include(CheckCilk)
+# [sizhuo] XXX I am not sure about large file support in riscv linux
 include(CheckMmap)
 
 # HugePages
-include(CheckHugePages)
+# [sizhuo] Unfortunately, we don't have huge page in linux. Enabling the check
+# will cause cmake to fail, so just turn this off.
+#include(CheckHugePages)
+set(HAVE_HUGEPAGES OFF CACHE BOOL "Have hugepages")
+if(NOT HAVE_HUGEPAGES)
+  message(WARNING "No huge page")
+  add_definitions(-DGALOIS_NO_HUGE_PAGE)
+endif()
 if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
   message(FATAL_ERROR "Need huge pages")
 endif()
